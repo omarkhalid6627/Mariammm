@@ -993,11 +993,13 @@
   function goToSlide(n) {
     const slides = document.querySelectorAll('.slide');
     const dots = document.querySelectorAll('.dot');
+    const total = slides.length;
+    if (total === 0) return;
     slides[currentSlide].classList.remove('active');
-    dots[currentSlide].classList.remove('active');
-    currentSlide = (n + photos.length) % photos.length;
+    if (dots[currentSlide]) dots[currentSlide].classList.remove('active');
+    currentSlide = ((n % total) + total) % total;
     slides[currentSlide].classList.add('active');
-    dots[currentSlide].classList.add('active');
+    if (dots[currentSlide]) dots[currentSlide].classList.add('active');
   }
 
   function changeSlide(dir) {
@@ -1269,15 +1271,8 @@
   });
 
   // Mariam Panel functions
-  const PASS = 'mariam';
-
   window.openMariamPanel = function() {
-    const p = prompt('أدخلي كلمة السر يا مريومتي 🔑');
-    if (p === PASS) {
-      document.getElementById('mariamPanel').classList.add('show');
-    } else if (p !== null) {
-      alert('كلمة السر غلط ❌');
-    }
+    document.getElementById('mariamPanel').classList.add('show');
   };
 
   window.closeMariamPanel = function() {
