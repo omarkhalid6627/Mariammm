@@ -632,7 +632,7 @@
 
 <!-- Sticker Button -->
 <button id="stickerBtn" onclick="launchStickerImg()" title="ستيكر">🫶</button>
-<div id="stickerImgOverlay" onclick="this.style.display='none'">
+<div id="stickerImgOverlay" onclick="this.classList.remove('show')">
   <img id="stickerImgEl" src="sticker.jpg" />
   <div id="stickerImgClose">✕</div>
 </div>
@@ -1209,13 +1209,22 @@
   document.getElementById('dailyMsg').textContent = getDailyMessage();
 
   // ===== 4. DARK MODE =====
-  let darkMode = false;
-  function toggleDark() {
-    darkMode = !darkMode;
+  // ===== 4. DARK MODE =====
+  let darkMode = localStorage.getItem('darkMode') === 'true';
+
+  function applyDark() {
     document.body.classList.toggle('dark-mode', darkMode);
     document.getElementById('starsCanvas').style.opacity = darkMode ? '1' : '0';
     document.getElementById('darkBtn').textContent = darkMode ? '☀️' : '🌙';
   }
+
+  function toggleDark() {
+    darkMode = !darkMode;
+    localStorage.setItem('darkMode', darkMode);
+    applyDark();
+  }
+
+  applyDark();
 
 
 
