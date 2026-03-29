@@ -301,7 +301,7 @@
   /* ========== SLIDESHOW ========== */
   .slideshow-section {
     width: 100%;
-    max-width: 420px;
+    max-width: 480px;
     margin: 0 auto 40px;
     animation: fadeUp 1.3s ease forwards;
   }
@@ -319,7 +319,7 @@
   .slideshow-wrapper {
     position: relative;
     width: 100%;
-    aspect-ratio: 4/3;
+    aspect-ratio: 1/1;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 8px 40px rgba(232, 115, 154, 0.25);
@@ -340,7 +340,7 @@
   .slide img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
   }
 
   .slide-overlay {
@@ -455,7 +455,7 @@
     border: 2px solid rgba(232, 115, 154, 0.3);
     border-radius: 24px;
     padding: 40px 32px;
-    max-width: 420px;
+    max-width: 600px;
     width: 100%;
     text-align: center;
     position: relative;
@@ -1226,8 +1226,245 @@
 
   applyDark();
 
+  // Expose functions to window for onclick handlers
+  window.toggleMusic = toggleMusic;
+  window.openMariamPanel = openMariamPanel;
+  window.closeMariamPanel = closeMariamPanel;
+  window.mariamAddPhoto = mariamAddPhoto;
+  window.mariamSendMsg = mariamSendMsg;
+  window.switchSong = switchSong;
+  window.changeSlide = changeSlide;
+  window.openSecret = openSecret;
+  window.closeSecret = closeSecret;
+  window.toggleDark = toggleDark;
+  window.launchStickerImg = launchStickerImg;
 
+  // ===== FIREBASE =====
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAWg8LIK-PuWw-mvhFP1HqAVK6PpWxWfKs",
+    authDomain: "mariomty.firebaseapp.com",
+    projectId: "mariomty",
+    storageBucket: "mariomty.firebasestorage.app",
+    messagingSenderId: "156319276735",
+    appId: "1:156319276735:web:c0a5591a5e464efc2b700a"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // ===== LOAD EXTRA PHOTOS FROM FIRESTORE =====
+  onSnapshot(collection(db, 'photos'), (snapshot) => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === 'added') {
+        const data = change.doc.data();
+        const wrapper = document.getElementById('slideshow');
+        const slide = document.createElement('div');
+        slide.className = 'slide';
+        slide.innerHTML = `<img src="${data.url}" loading="lazy" /><div class="slide-overlay"></div>`;
+        wrapper.insertBefore(slide, wrapper.querySelector('.slide-nav'));
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        dot.onclick = () => goToSlide(document.querySelectorAll('.slide').length - 1);
+        document.getElementById('dots').appendChild(dot);
+      }
+    });
+  });
+
+  // ===== LOAD SECRET MESSAGES FROM FIRESTORE =====
+  const msgQuery = query(collection(db, 'messages'), orderBy('time', 'desc'));
+  onSnapshot(msgQuery, (snapshot) => {
+    if (!snapshot.empty) {
+      const latest = snapshot.docs[0].data();
+      document.getElementById('secretMessage').innerHTML = latest.text;
+    }
+  });
+
+  // ===== MARIAM PANEL =====
+  const MARIAM_PASS = 'mariam';
+  let mariamUnlocked = false;
+
+  function openMariamPanel() {
+    const pass = prompt('أدخلي كلمة السر يا مريومتي 🔑');
+    if (pass === MARIAM_PASS) {
+      mariamUnlocked = true;
+      document.getElementById('mariamPanel').classList.add('show');
+    } else if (pass !== null) {
+      alert('كلمة السر غلط ❌');
+    }
+  }
+
+  function closeMariamPanel() {
+    document.getElementById('mariamPanel').classList.remove('show');
+  }
+
+  async function mariamAddPhoto() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        // Compress image
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 800;
+          const scale = Math.min(1, maxW / img.width);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.7);
+          await addDoc(collection(db, 'photos'), { url: compressed, time: serverTimestamp() });
+          alert('✅ الصورة اتضافت!');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  async function mariamSendMsg() {
+    const txt = document.getElementById('mariamMsgInput').value.trim();
+    if (!txt) return;
+    await addDoc(collection(db, 'messages'), { text: txt, time: serverTimestamp() });
+    document.getElementById('mariamMsgInput').value = '';
+    alert('✅ الرسالة اتبعتت!');
+  }
 
 </script>
+
+<!-- Mariam Secret Button -->
+<button id="mariamBtn" onclick="openMariamPanel()" title="مريم فقط">🌸</button>
+
+<!-- Mariam Panel -->
+<div id="mariamPanel">
+  <div id="mariamPanelBox">
+    <button id="mariamCloseBtn" onclick="closeMariamPanel()">✕</button>
+    <div id="mariamPanelTitle">لوحة مريومتي 🌸</div>
+
+    <div class="mariamSection">
+      <div class="mariamSectionTitle">✨ ضيفي صورة للسلايد شو</div>
+      <button class="mariamActionBtn" onclick="mariamAddPhoto()">📷 اختاري صورة</button>
+    </div>
+
+    <div class="mariamSection">
+      <div class="mariamSectionTitle">💌 ابعتيلي رسالة سرية</div>
+      <textarea id="mariamMsgInput" placeholder="اكتبي هنا..."></textarea>
+      <button class="mariamActionBtn" onclick="mariamSendMsg()">إرسال 💗</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  #mariamBtn {
+    position: fixed;
+    top: 128px;
+    left: 24px;
+    z-index: 999;
+    background: linear-gradient(135deg, rgba(255,240,248,0.92), rgba(255,210,230,0.92));
+    border: 1.5px solid rgba(232,115,154,0.4);
+    border-radius: 50%;
+    width: 42px; height: 42px;
+    font-size: 20px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(232,115,154,0.2);
+    transition: all 0.3s ease;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #mariamBtn:hover { transform: scale(1.1); }
+
+  #mariamPanel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  #mariamPanel.show { display: flex; }
+
+  #mariamPanelBox {
+    background: linear-gradient(135deg, #fff0f8, #ffd6e8);
+    border-radius: 24px;
+    padding: 28px 24px;
+    width: 85vw;
+    max-width: 380px;
+    position: relative;
+    direction: rtl;
+    box-shadow: 0 10px 50px rgba(232,115,154,0.3);
+  }
+  #mariamCloseBtn {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #9e3d65;
+    opacity: 0.6;
+  }
+  #mariamPanelTitle {
+    font-family: 'Amiri', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #9e3d65;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .mariamSection {
+    background: rgba(255,255,255,0.6);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+    border: 1px solid rgba(232,115,154,0.2);
+  }
+  .mariamSectionTitle {
+    font-family: 'Amiri', serif;
+    font-size: 14px;
+    color: #9e3d65;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .mariamActionBtn {
+    background: linear-gradient(135deg, #e8739a, #f4a7c3);
+    border: none;
+    border-radius: 50px;
+    padding: 10px 20px;
+    color: white;
+    font-family: 'Amiri', serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.3s ease;
+  }
+  .mariamActionBtn:hover { opacity: 0.9; transform: translateY(-1px); }
+  #mariamMsgInput {
+    width: 100%;
+    border: 1px solid rgba(232,115,154,0.3);
+    border-radius: 12px;
+    padding: 10px;
+    font-family: 'Amiri', serif;
+    font-size: 14px;
+    color: #5a1f3a;
+    background: rgba(255,255,255,0.8);
+    resize: none;
+    height: 80px;
+    margin-bottom: 10px;
+    direction: rtl;
+    outline: none;
+    box-sizing: border-box;
+  }
+</style>
+
 </body>
 </html>
