@@ -850,7 +850,7 @@
 
 <div class="secret-section">
 <button class="secret-btn" onclick="openSecret()">
-      🤫 اضغطي هنا
+      🤫 اضغط هنا
     </button>
 </div>
   </div>
@@ -1335,11 +1335,56 @@
   window.mariamSendMsg = async function() {
     const txt = document.getElementById('mariamMsgInput').value.trim();
     if (!txt) return;
-    // Send to both: old messages collection + omar's inbox
-    await addDoc(collection(db, 'messages'), { text: txt, time: serverTimestamp() });
-    await addDoc(collection(db, 'inbox_omar'), { text: txt, from: 'mariam', time: serverTimestamp() });
+    await addDoc(collection(db, 'chat'), { text: txt, from: 'mariam', to: 'omar', time: serverTimestamp() });
     document.getElementById('mariamMsgInput').value = '';
-    alert('✅ الرسالة اتبعتت!');
+    alert('✅ الرسالة اتبعتت لعمورتك! 💗');
+  };
+
+  // Omar send message to Mariam
+  window.openOmarMsg = function() {
+    document.getElementById('omarMsgModal').classList.add('open');
+  };
+  window.closeOmarMsg = function(e) {
+    if (!e || e.target === document.getElementById('omarMsgModal')) {
+      document.getElementById('omarMsgModal').classList.remove('open');
+    }
+  };
+  window.omarSendMsg = async function() {
+    const txt = document.getElementById('omarMsgInput').value.trim();
+    if (!txt) return;
+    // Save to shared collection with sender tag
+    await addDoc(collection(db, 'chat'), { text: txt, from: 'omar', to: 'mariam', time: serverTimestamp() });
+    document.getElementById('omarMsgInput').value = '';
+    document.getElementById('omarMsgModal').classList.remove('open');
+    alert('✅ الرسالة اتبعتت لمريومتي! 💗');
+  };
+
+  // Load messages TO Omar (from Mariam) - for banner + secret modal
+  const lastMsgId = localStorage.getItem('lastMsgId_omar') || '';
+  const chatQ = query(collection(db, 'chat'), orderBy('time', 'desc'));
+  onSnapshot(chatQ, (snap) => {
+    // Find latest message TO omar
+    const toOmar = snap.docs.find(d => d.data().to === 'omar');
+    if (toOmar) {
+      // Update secret modal with latest message from mariam
+      document.getElementById('secretMessage').innerHTML = toOmar.data().text;
+      // Show banner if new
+      if (toOmar.id !== lastMsgId) {
+        const banner = document.getElementById('msgBanner');
+        document.getElementById('msgBannerText').textContent = '💌 عندك رسالة من مريومتي 💗';
+        banner.style.display = 'block';
+        banner.dataset.msg = toOmar.data().text;
+        banner.dataset.msgId = toOmar.id;
+        setTimeout(() => { banner.style.display = 'none'; }, 8000);
+      }
+    }
+  });
+
+  window.openMsgFromBanner = function() {
+    const banner = document.getElementById('msgBanner');
+    localStorage.setItem('lastMsgId_omar', banner.dataset.msgId);
+    banner.style.display = 'none';
+    document.getElementById('secretModal').classList.add('open');
   };
 </script>
 
