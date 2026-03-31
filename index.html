@@ -1313,11 +1313,14 @@
   };
 
   // ===== FIREBASE SONGS =====
-  window.firebaseSongs = [];
-
   onSnapshot(collection(db, 'songs'), (snapshot) => {
     window.firebaseSongs = snapshot.docs.map(d => ({ id: d.id, url: d.data().url, name: d.data().name || '🎵 أغنية جديدة' }));
     renderSongManager();
+    // Update music name display if showing a firebase song
+    const all = getAllSongs();
+    if (currentSong < all.length) {
+      musicName.textContent = all[currentSong].name;
+    }
   });
 
   function renderSongManager() {
