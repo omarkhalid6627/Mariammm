@@ -1029,32 +1029,24 @@
 
   // ===== Music Player =====
   // Static songs
+  // ===== MUSIC PLAYER =====
   const staticSongs = [
-    { url: document.getElementById('bgMusic0').src, name: 'Mia & Sebastian' },
-    { url: document.getElementById('bgMusic1').src, name: 'Die With A Smile' }
+    { url: 'https://res.cloudinary.com/dg5umhl7o/video/upload/v1774819439/song1_usrsad.m4a', name: 'Mia & Sebastian' },
+    { url: 'https://res.cloudinary.com/dg5umhl7o/video/upload/v1774819445/song2_biawan.mp3', name: 'Die With A Smile' }
   ];
-  // Firebase songs will be added here
   window.firebaseSongs = [];
 
-  // Build songs list dynamically
   function getAllSongs() {
     return [...staticSongs, ...window.firebaseSongs];
   }
 
-  const songs = getAllSongs;
   let currentSong = 0;
   let musicStarted = false;
 
-  // Single audio element for playback
-  const activeAudio = document.getElementById('bgMusic0');
-  activeAudio.src = staticSongs[0].url;
-
+  const activeAudio = new Audio();
+  activeAudio.loop = true;
   activeAudio.volume = 0.7;
-
-  const musicBtn = document.getElementById('musicBtn');
-  const musicIcon = document.getElementById('musicIcon');
-  const musicLabel = document.getElementById('musicLabel');
-  const musicName = document.getElementById('musicName');
+  activeAudio.src = staticSongs[0].url;
 
   function updateUI(playing) {
     musicIcon.textContent = playing ? '♫' : '♪';
@@ -1064,7 +1056,11 @@
   }
 
   function playCurrentSong() {
-    songs[currentSong].el.play().then(() => updateUI(true)).catch(() => {});
+    const s = getAllSongs()[currentSong];
+    activeAudio.src = s.url;
+    activeAudio.loop = true;
+    activeAudio.volume = 0.7;
+    activeAudio.play().then(() => updateUI(true)).catch(() => {});
   }
 
   function startOnInteraction() {
@@ -1075,7 +1071,6 @@
     document.removeEventListener('touchstart', startOnInteraction);
   }
 
-  // Try autoplay immediately, fallback to first interaction
   activeAudio.play().then(() => {
     musicStarted = true;
     updateUI(true);
@@ -1099,10 +1094,11 @@
     activeAudio.pause();
     activeAudio.currentTime = 0;
     currentSong = (currentSong + 1) % getAllSongs().length;
-    musicName.textContent = getAllSongs()[currentSong].name;
     if (wasPlaying || musicStarted) {
       musicStarted = true;
       playCurrentSong();
+    } else {
+      updateUI(false);
     }
   }
 
