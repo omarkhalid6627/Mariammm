@@ -1348,16 +1348,34 @@
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'audio/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const name = file.name.replace(/\.[^/.]+$/, '');
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        await addDoc(collection(db, 'songs'), { url: ev.target.result, name: name, time: serverTimestamp() });
-        alert('✅ الأغنية اتضافت!');
-      };
-      reader.readAsDataURL(file);
+
+      alert('⏳ جاري الرفع، استنّي شوية...');
+
+      // Upload to Cloudinary
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'mariam_upload');
+      formData.append('resource_type', 'video'); // audio = video in Cloudinary
+
+      try {
+        const res = await fetch('https://api.cloudinary.com/v1_1/dg5umhl7o/video/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.secure_url) {
+          await addDoc(collection(db, 'songs'), { url: data.secure_url, name: name, time: serverTimestamp() });
+          alert('✅ الأغنية اتضافت!');
+        } else {
+          alert('❌ حصل خطأ في الرفع');
+        }
+      } catch (err) {
+        alert('❌ حصل خطأ: ' + err.message);
+      }
     };
     input.click();
   };
