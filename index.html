@@ -1244,7 +1244,7 @@
 <!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const app = initializeApp({
     apiKey: "AIzaSyAWg8LIK-PuWw-mvhFP1HqAVK6PpWxWfKs",
@@ -1312,7 +1312,53 @@
     await deleteDoc(doc(db, 'photos', docId));
   };
 
-  // ===== FIREBASE SONGS =====
+  // ===== LETTER =====
+  const letterRef = doc(db, 'letter', 'main');
+
+  onSnapshot(letterRef, (snap) => {
+    const data = snap.data();
+    const hasmsg = data && data.text && data.text.trim();
+    document.getElementById('envelopeDot').classList.toggle('active', !!hasmsg);
+    window._letterText = hasmsg ? data.text : null;
+  });
+
+  window.openLetterModal = function() {
+    const modal = document.getElementById('letterModal');
+    const empty = document.getElementById('letterEmptyState');
+    const content = document.getElementById('letterContent');
+    const textEl = document.getElementById('letterText');
+
+    modal.classList.add('open');
+    if (window._letterText) {
+      empty.style.display = 'none';
+      content.style.display = 'block';
+      textEl.textContent = '';
+      // Typewriter effect
+      let i = 0;
+      const txt = window._letterText;
+      function type() {
+        if (i < txt.length) { textEl.textContent += txt[i++]; setTimeout(type, 28); }
+      }
+      type();
+    } else {
+      empty.style.display = 'block';
+      content.style.display = 'none';
+    }
+  };
+
+  window.closeLetterModal = function() {
+    document.getElementById('letterModal').classList.remove('open');
+  };
+
+  window.mariamSendLetter = async function() {
+    const txt = document.getElementById('mariamLetterInput').value.trim();
+    if (!txt) return;
+    await setDoc(doc(db, 'letter', 'main'), { text: txt, time: serverTimestamp() });
+    document.getElementById('mariamLetterInput').value = '';
+    alert('✅ الرسالة اتبعتت!');
+  };
+
+  // ===== FIREBASE PHOTOS =====
   onSnapshot(collection(db, 'songs'), (snapshot) => {
     window.firebaseSongs = snapshot.docs.map(d => ({ id: d.id, url: d.data().url, name: d.data().name || '🎵 أغنية جديدة' }));
     renderSongManager();
@@ -1380,6 +1426,71 @@
     input.click();
   };
 
+  // ===== ENVELOPE / LETTER =====
+  let currentLetter = null;
+  let letterOpened = false;
+
+  // Firebase listener for latest letter
+  const letterQ = query(collection(db, 'letters'), orderBy('time', 'desc'));
+  onSnapshot(letterQ, (snapshot) => {
+    if (!snapshot.empty) {
+      currentLetter = snapshot.docs[0].data().text || '';
+      document.getElementById('envelopeDot').classList.add('active');
+    } else {
+      currentLetter = null;
+      document.getElementById('envelopeDot').classList.remove('active');
+    }
+  });
+
+  window.openLetterModal = function() {
+    const modal = document.getElementById('letterModal');
+    modal.classList.add('open');
+    document.getElementById('envelopeDot').classList.remove('active');
+
+    if (!currentLetter) {
+      document.getElementById('letterEmptyState').style.display = 'block';
+      document.getElementById('letterContent').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('letterEmptyState').style.display = 'none';
+    document.getElementById('letterContent').style.display = 'block';
+
+    if (!letterOpened) {
+      letterOpened = true;
+      // Typewriter effect
+      const el = document.getElementById('letterText');
+      el.textContent = '';
+      let i = 0;
+      const txt = currentLetter;
+      const type = () => {
+        if (i < txt.length) {
+          el.textContent += txt[i++];
+          setTimeout(type, 35);
+        }
+      };
+      setTimeout(type, 300);
+    } else {
+      document.getElementById('letterText').textContent = currentLetter;
+    }
+  };
+
+  window.closeLetterModal = function() {
+    document.getElementById('letterModal').classList.remove('open');
+  };
+
+  window.mariamSendLetter = async function() {
+    const txt = document.getElementById('mariamLetterInput').value.trim();
+    if (!txt) return;
+    // Delete old letters first, keep only latest
+    const old = await getDocs(collection(db, 'letters'));
+    for (const d of old.docs) await deleteDoc(doc(db, 'letters', d.id));
+    await addDoc(collection(db, 'letters'), { text: txt, time: serverTimestamp() });
+    document.getElementById('mariamLetterInput').value = '';
+    letterOpened = false; // reset so typewriter plays again
+    alert('✅ الرسالة اتبعتت! 💌');
+  };
+
   // Load latest secret message
   const msgQ = query(collection(db, 'messages'), orderBy('time', 'desc'));
   onSnapshot(msgQ, (snapshot) => {
@@ -1442,6 +1553,34 @@
   
 </script>
 
+<!-- Envelope Widget -->
+<div id="envelopeBtn" onclick="openLetterModal()" title="رسالة من مريم">
+  <svg viewBox="0 0 48 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="46" height="34" rx="4" fill="rgba(255,240,248,0.95)" stroke="#e8739a" stroke-width="1.5"/>
+    <path d="M1 5 L24 21 L47 5" stroke="#e8739a" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+    <path d="M1 35 L16 20" stroke="#f4a7c3" stroke-width="1" opacity="0.6"/>
+    <path d="M47 35 L32 20" stroke="#f4a7c3" stroke-width="1" opacity="0.6"/>
+  </svg>
+  <div id="envelopeDot"></div>
+</div>
+
+<!-- Letter Modal -->
+<div id="letterModal">
+  <div id="letterCard">
+    <button id="letterCloseBtn" onclick="closeLetterModal()">&#x2715;</button>
+    <div id="letterInner">
+      <div id="letterEmptyState">
+        <div style="font-size:38px;margin-bottom:12px;">&#x2709;&#xFE0F;</div>
+        <div style="font-family:'Amiri',serif;font-size:15px;color:#9e3d65;opacity:0.6;">مفيش رسالة لسه 🌸</div>
+      </div>
+      <div id="letterContent" style="display:none;">
+        <div id="letterFrom">💌 من مريم</div>
+        <div id="letterText"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Mariam Button -->
 <button id="mariamBtn" onclick="openMariamPanel()" title="مريم فقط">🌸</button>
 
@@ -1453,6 +1592,11 @@
       <div id="mariamPanelTitle">لوحة مريومتي 🌸</div>
     </div>
     <div id="mariamScrollBody">
+      <div class="mariamSection">
+        <div class="mariamSectionTitle">💌 ابعتيله رسالة</div>
+        <textarea id="mariamLetterInput" placeholder="اكتبي رسالتك هنا..."></textarea>
+        <button class="mariamActionBtn" onclick="mariamSendLetter()">💌 ابعتي</button>
+      </div>
       <div class="mariamSection">
         <div class="mariamSectionTitle">✨ ضيفي صورة للسلايد شو</div>
         <button class="mariamActionBtn" onclick="mariamAddPhoto()">📷 اختاري صورة</button>
@@ -1491,6 +1635,107 @@
     display: flex; align-items: center; justify-content: center;
   }
   #mariamBtn:hover { transform: scale(1.1); }
+
+  /* ===== ENVELOPE ===== */
+  #envelopeBtn {
+    position: fixed;
+    bottom: 28px;
+    left: 24px;
+    z-index: 999;
+    width: 54px; height: 42px;
+    cursor: pointer;
+    filter: drop-shadow(0 4px 12px rgba(232,115,154,0.25));
+    transition: transform 0.3s, filter 0.3s;
+  }
+  #envelopeBtn:hover { transform: scale(1.08) rotate(-3deg); filter: drop-shadow(0 6px 18px rgba(232,115,154,0.4)); }
+  #envelopeBtn svg { width: 100%; height: 100%; }
+  #envelopeDot {
+    position: absolute;
+    top: -4px; right: -4px;
+    width: 11px; height: 11px;
+    background: #e8739a;
+    border-radius: 50%;
+    border: 2px solid white;
+    display: none;
+    animation: pulseDot 1.5s infinite;
+  }
+  #envelopeDot.active { display: block; }
+  @keyframes pulseDot {
+    0%,100% { transform: scale(1); opacity:1; }
+    50% { transform: scale(1.3); opacity:0.7; }
+  }
+
+  /* ===== LETTER MODAL ===== */
+  #letterModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  #letterModal.open { display: flex; }
+  #letterCard {
+    background: linear-gradient(160deg, #fffaf5 0%, #fff0f8 60%, #fde8f2 100%);
+    border-radius: 20px;
+    width: 88vw;
+    max-width: 360px;
+    min-height: 220px;
+    max-height: 80vh;
+    position: relative;
+    box-shadow: 0 12px 50px rgba(232,115,154,0.25), 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid rgba(232,115,154,0.2);
+    overflow: hidden;
+    animation: letterPop 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  @keyframes letterPop {
+    from { transform: scale(0.85) translateY(20px); opacity: 0; }
+    to   { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  #letterCard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #e8739a, #f4a7c3, transparent);
+  }
+  #letterCloseBtn {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(232,115,154,0.3);
+    border-radius: 50%;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer;
+    color: #9e3d65;
+    z-index: 5;
+  }
+  #letterInner {
+    padding: 40px 28px 32px;
+    direction: rtl;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+  #letterEmptyState { text-align: center; padding: 20px 0; }
+  #letterFrom {
+    font-family: 'Amiri', serif;
+    font-size: 13px;
+    color: #e8739a;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+    opacity: 0.8;
+  }
+  #letterText {
+    font-family: 'Amiri', serif;
+    font-size: 18px;
+    line-height: 1.9;
+    color: #5a1f3a;
+    white-space: pre-wrap;
+    min-height: 40px;
+  }
   #mariamPanel {
     display: none;
     position: fixed;
@@ -1567,7 +1812,7 @@
     transition: all 0.3s;
   }
   .mariamActionBtn:hover { opacity: 0.9; transform: translateY(-1px); }
-  #mariamMsgInput {
+  #mariamMsgInput, #mariamLetterInput {
     width: 100%; border: 1px solid rgba(232,115,154,0.3);
     border-radius: 12px; padding: 10px;
     font-family: 'Amiri', serif; font-size: 14px;
