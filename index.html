@@ -834,6 +834,42 @@
   </div>
 
 
+  <!-- Mood Section -->
+  <div class="ornament-divider" style="margin-top:10px;"><span>♡</span></div>
+  <div class="mood-section">
+    <div class="mood-label">مزاج مريم دلوقتي</div>
+    <div id="moodDisplay">
+      <span id="moodEmoji">—</span>
+      <span id="moodTime"></span>
+    </div>
+  </div>
+
+  <!-- Watchlist Section -->
+  <div class="ornament-divider"><span>♡</span></div>
+  <div class="watchlist-section">
+    <div class="watchlist-header">
+      <div class="watchlist-title">🎬 هنتفرج عليها مع بعض</div>
+      <button class="watchlist-add-btn" onclick="openAddWatch()">+ ضيف</button>
+    </div>
+    <div id="watchlistItems">
+      <div class="watchlist-empty">مفيش حاجة مضافة لسه 🍿</div>
+    </div>
+  </div>
+
+  <!-- Add Watchlist Modal -->
+  <div id="addWatchModal" onclick="closeAddWatch(event)">
+    <div id="addWatchBox">
+      <button id="addWatchClose" onclick="closeAddWatch()">✕</button>
+      <div id="addWatchTitle">🎬 ضيف فيلم أو مسلسل</div>
+      <input id="addWatchInput" type="text" placeholder="اسم الفيلم أو المسلسل..." />
+      <div id="addWatchTypeRow">
+        <button class="watchTypeBtn active" onclick="selectWatchType('film', this)">🎬 فيلم</button>
+        <button class="watchTypeBtn" onclick="selectWatchType('series', this)">📺 مسلسل</button>
+      </div>
+      <button id="addWatchSubmit" onclick="submitWatch()">ضيف ✨</button>
+    </div>
+  </div>
+
   <!-- Secret Button -->
   <div class="secret-section">
     <div class="secret-section">
@@ -1491,6 +1527,121 @@
     alert('✅ الرسالة اتبعتت! 💌');
   };
 
+  // ===== MOOD =====
+  let currentMoodEmoji = null;
+
+  onSnapshot(collection(db, 'mood'), (snapshot) => {
+    if (!snapshot.empty) {
+      const data = snapshot.docs[0].data();
+      currentMoodEmoji = data.emoji;
+      document.getElementById('moodEmoji').textContent = data.emoji;
+      if (data.time) {
+        const d = data.time.toDate();
+        const timeStr = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('moodTime').textContent = 'منذ ' + timeStr;
+      }
+      // highlight selected mood in panel
+      document.querySelectorAll('.moodPickerBtn').forEach(b => {
+        b.classList.toggle('selected', b.textContent === data.emoji);
+      });
+    }
+  });
+
+  window.setMood = async function(emoji) {
+    const old = await getDocs(collection(db, 'mood'));
+    for (const d of old.docs) await deleteDoc(doc(db, 'mood', d.id));
+    await addDoc(collection(db, 'mood'), { emoji, time: serverTimestamp() });
+    document.querySelectorAll('.moodPickerBtn').forEach(b => {
+      b.classList.toggle('selected', b.textContent === emoji);
+    });
+  };
+
+  // ===== WATCHLIST =====
+  let watchType = 'film';
+
+  window.selectWatchType = function(type, btn) {
+    watchType = type;
+    document.querySelectorAll('.watchTypeBtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+
+  window.openAddWatch = function() {
+    document.getElementById('addWatchModal').classList.add('open');
+    document.getElementById('addWatchInput').focus();
+  };
+
+  window.closeAddWatch = function(e) {
+    if (!e || e.target === document.getElementById('addWatchModal') || e.currentTarget.id === 'addWatchClose') {
+      document.getElementById('addWatchModal').classList.remove('open');
+      document.getElementById('addWatchInput').value = '';
+    }
+  };
+
+  window.submitWatch = async function() {
+    const name = document.getElementById('addWatchInput').value.trim();
+    if (!name) return;
+    await addDoc(collection(db, 'watchlist'), { name, type: watchType, done: false, time: serverTimestamp() });
+    document.getElementById('addWatchModal').classList.remove('open');
+    document.getElementById('addWatchInput').value = '';
+  };
+
+  window.toggleWatchDone = async function(id, currentDone) {
+    if (!currentDone) launchConfetti();
+    await setDoc(doc(db, 'watchlist', id), { done: !currentDone }, { merge: true });
+  };
+
+  window.deleteWatchItem = async function(id) {
+    await deleteDoc(doc(db, 'watchlist', id));
+  };
+
+  function launchConfetti() {
+    for (let i = 0; i < 40; i++) {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.style.cssText = `
+          position:fixed; z-index:99999; pointer-events:none;
+          left:${Math.random()*100}vw; top:-10px;
+          font-size:${14+Math.random()*14}px;
+          animation: confettiFall ${1.5+Math.random()}s ease-in forwards;
+        `;
+        el.textContent = ['🎉','💗','⭐','🌸','✨','💕'][Math.floor(Math.random()*6)];
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      }, i * 60);
+    }
+  }
+
+  // Add confetti keyframe
+  const confettiStyle = document.createElement('style');
+  confettiStyle.textContent = `
+    @keyframes confettiFall {
+      0% { transform: translateY(0) rotate(0deg); opacity:1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity:0; }
+    }
+  `;
+  document.head.appendChild(confettiStyle);
+
+  const watchQ = query(collection(db, 'watchlist'), orderBy('time', 'asc'));
+  onSnapshot(watchQ, (snapshot) => {
+    const container = document.getElementById('watchlistItems');
+    if (snapshot.empty) {
+      container.innerHTML = '<div class="watchlist-empty">مفيش حاجة مضافة لسه 🍿</div>';
+      return;
+    }
+    container.innerHTML = snapshot.docs.map(d => {
+      const data = d.data();
+      const icon = data.type === 'series' ? '📺' : '🎬';
+      return `
+        <div class="watch-item ${data.done ? 'done' : ''}">
+          <button class="watch-check" onclick="toggleWatchDone('${d.id}', ${data.done})">${data.done ? '✓' : ''}</button>
+          <span class="watch-type-icon">${icon}</span>
+          <span class="watch-name">${data.name}</span>
+          <button class="watch-delete" onclick="deleteWatchItem('${d.id}')">🗑️</button>
+        </div>
+      `;
+    }).join('');
+  });
+
   // Load latest secret message
   const msgQ = query(collection(db, 'messages'), orderBy('time', 'desc'));
   onSnapshot(msgQ, (snapshot) => {
@@ -1593,6 +1744,19 @@
     </div>
     <div id="mariamScrollBody">
       <div class="mariamSection">
+        <div class="mariamSectionTitle">😊 مزاجك دلوقتي</div>
+        <div class="moodPicker">
+          <button class="moodPickerBtn" onclick="setMood('😊')">😊</button>
+          <button class="moodPickerBtn" onclick="setMood('🥰')">🥰</button>
+          <button class="moodPickerBtn" onclick="setMood('😴')">😴</button>
+          <button class="moodPickerBtn" onclick="setMood('🥺')">🥺</button>
+          <button class="moodPickerBtn" onclick="setMood('😂')">😂</button>
+          <button class="moodPickerBtn" onclick="setMood('😤')">😤</button>
+          <button class="moodPickerBtn" onclick="setMood('🤩')">🤩</button>
+          <button class="moodPickerBtn" onclick="setMood('😪')">😪</button>
+        </div>
+      </div>
+      <div class="mariamSection">
         <div class="mariamSectionTitle">💌 ابعتيله رسالة</div>
         <textarea id="mariamLetterInput" placeholder="اكتبي رسالتك هنا..."></textarea>
         <button class="mariamActionBtn" onclick="mariamSendLetter()">💌 ابعتي</button>
@@ -1636,7 +1800,256 @@
   }
   #mariamBtn:hover { transform: scale(1.1); }
 
-  /* ===== ENVELOPE ===== */
+  /* ===== MOOD SECTION ===== */
+  .mood-section {
+    width: 100%;
+    max-width: 420px;
+    background: linear-gradient(145deg, rgba(255,255,255,0.85), rgba(255,220,235,0.6));
+    border: 1px solid rgba(232,115,154,0.3);
+    border-radius: 20px;
+    padding: 22px 28px;
+    text-align: center;
+    margin-bottom: 10px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(232,115,154,0.1);
+  }
+  .mood-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--rose);
+    opacity: 0.7;
+    margin-bottom: 14px;
+  }
+  #moodDisplay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  #moodEmoji {
+    font-size: 48px;
+    line-height: 1;
+  }
+  #moodTime {
+    font-family: 'Amiri', serif;
+    font-size: 12px;
+    color: var(--rose);
+    opacity: 0.6;
+  }
+
+  /* ===== WATCHLIST SECTION ===== */
+  .watchlist-section {
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 40px;
+  }
+  .watchlist-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    direction: rtl;
+  }
+  .watchlist-title {
+    font-family: 'Amiri', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--deep);
+  }
+  .watchlist-add-btn {
+    background: linear-gradient(135deg, #e8739a, #f4a7c3);
+    border: none;
+    border-radius: 50px;
+    padding: 7px 16px;
+    color: white;
+    font-family: 'Amiri', serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .watchlist-add-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .watchlist-empty {
+    text-align: center;
+    color: var(--rose);
+    opacity: 0.5;
+    font-family: 'Amiri', serif;
+    font-size: 14px;
+    padding: 20px 0;
+  }
+  .watch-item {
+    background: linear-gradient(145deg, rgba(255,255,255,0.85), rgba(255,220,235,0.5));
+    border: 1px solid rgba(232,115,154,0.25);
+    border-radius: 16px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    direction: rtl;
+    box-shadow: 0 2px 12px rgba(232,115,154,0.08);
+    transition: all 0.3s;
+  }
+  .watch-item.done {
+    opacity: 0.5;
+  }
+  .watch-item.done .watch-name {
+    text-decoration: line-through;
+  }
+  .watch-check {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid rgba(232,115,154,0.5);
+    background: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all 0.3s;
+    color: transparent;
+  }
+  .watch-item.done .watch-check {
+    background: linear-gradient(135deg, #e8739a, #f4a7c3);
+    border-color: transparent;
+    color: white;
+  }
+  .watch-type-icon { font-size: 20px; flex-shrink: 0; }
+  .watch-name {
+    font-family: 'Amiri', serif;
+    font-size: 15px;
+    color: var(--ink);
+    flex: 1;
+  }
+  .watch-delete {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.35;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+    padding: 4px;
+  }
+  .watch-delete:hover { opacity: 0.7; }
+
+  /* Add Watch Modal */
+  #addWatchModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(0,0,0,0.45);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  #addWatchModal.open { display: flex; }
+  #addWatchBox {
+    background: linear-gradient(135deg, #fff0f8, #ffd6e8);
+    border-radius: 24px;
+    padding: 32px 28px 28px;
+    width: 88vw;
+    max-width: 360px;
+    position: relative;
+    direction: rtl;
+    box-shadow: 0 10px 50px rgba(232,115,154,0.3);
+    animation: letterPop 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  #addWatchClose {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(232,115,154,0.3);
+    border-radius: 50%;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer;
+    color: #9e3d65;
+  }
+  #addWatchTitle {
+    font-family: 'Amiri', serif;
+    font-size: 18px; font-weight: 700;
+    color: #9e3d65; text-align: center;
+    margin-bottom: 20px;
+  }
+  #addWatchInput {
+    width: 100%;
+    border: 1px solid rgba(232,115,154,0.35);
+    border-radius: 12px;
+    padding: 11px 14px;
+    font-family: 'Amiri', serif;
+    font-size: 15px;
+    color: #5a1f3a;
+    background: rgba(255,255,255,0.85);
+    outline: none;
+    box-sizing: border-box;
+    margin-bottom: 14px;
+    direction: rtl;
+  }
+  #addWatchTypeRow {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .watchTypeBtn {
+    flex: 1;
+    background: rgba(255,255,255,0.6);
+    border: 1.5px solid rgba(232,115,154,0.3);
+    border-radius: 50px;
+    padding: 9px;
+    font-family: 'Amiri', serif;
+    font-size: 14px;
+    color: #9e3d65;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .watchTypeBtn.active {
+    background: linear-gradient(135deg, #e8739a, #f4a7c3);
+    border-color: transparent;
+    color: white;
+    font-weight: 700;
+  }
+  #addWatchSubmit {
+    width: 100%;
+    background: linear-gradient(135deg, #e8739a, #f4a7c3);
+    border: none;
+    border-radius: 50px;
+    padding: 12px;
+    color: white;
+    font-family: 'Amiri', serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  #addWatchSubmit:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* Mood picker in panel */
+  .moodPicker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .moodPickerBtn {
+    font-size: 30px;
+    background: rgba(255,255,255,0.6);
+    border: 2px solid transparent;
+    border-radius: 50%;
+    width: 52px; height: 52px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .moodPickerBtn:hover { transform: scale(1.15); }
+  .moodPickerBtn.selected {
+    border-color: #e8739a;
+    background: rgba(232,115,154,0.15);
+  }
+
+
   #envelopeBtn {
     position: fixed;
     bottom: 28px;
