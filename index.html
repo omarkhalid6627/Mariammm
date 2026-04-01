@@ -884,9 +884,7 @@
     <div class="secret-box">
       <button class="close-btn" onclick="closeSecret()">✕</button>
       <span class="heart-big">💗</span>
-      <div class="secret-message" id="secretMessage">
-        مريم أنا بحبك اوي اوي اوي اوي اوي اوي اوي اوي اوي اوي اوي اوي اوي 💗<br><br>عاوز اشكرك على اليوم الجميل اللي خلتيني أقضيه معاكي، عاوز اقولك أنه كان يوم ميتنسيش، اكتشفت فيه إني في حاجات غالية أكتر من الآثار اللي موجودة في المتاحف... "عيونك"، البصة ليكي، نظرتك وانت منبهرة، كل ده أغلى مليار مرة من المتحف باللي فيه<br><br>شكرا على إنك دفعتيلي النهارده 😂 يقمر انت<br><br>أنا بحبك اوي اوي اوي اوي اوي اوي اوي ويارب أكون بسّطتك اليوم ده 💗
-      </div>
+      <div class="secret-message" id="secretMessage"></div>
     </div>
   </div>
 
@@ -1694,6 +1692,35 @@
     alert('✅ اتبعتت!');
   };
 
+  // Omar Panel
+  window.openOmarPanel = function() {
+    document.getElementById('omarPanel').classList.add('show');
+  };
+  window.closeOmarPanel = function() {
+    document.getElementById('omarPanel').classList.remove('show');
+  };
+
+  window.omarSaveSecret = async function() {
+    const txt = document.getElementById('omarSecretInput').value.trim();
+    if (!txt) return;
+    const old = await getDocs(collection(db, 'secretmsg'));
+    for (const d of old.docs) await deleteDoc(doc(db, 'secretmsg', d.id));
+    await addDoc(collection(db, 'secretmsg'), { text: txt, time: serverTimestamp() });
+    closeOmarPanel();
+    alert('✅ الرسالة اتحفظت!');
+  };
+
+  // Load secret message from Firebase
+  onSnapshot(collection(db, 'secretmsg'), (snapshot) => {
+    if (!snapshot.empty) {
+      const txt = snapshot.docs[0].data().text;
+      document.getElementById('secretMessage').innerHTML = txt.replace(/\n/g, '<br>');
+      // pre-fill textarea
+      const input = document.getElementById('omarSecretInput');
+      if (input) input.value = txt;
+    }
+  });
+
   // Omar send message to Mariam
   window.openOmarMsg = function() {
     document.getElementById('omarMsgModal').classList.add('open');
@@ -1732,8 +1759,25 @@
   </div>
 </div>
 
-<!-- Mariam Button -->
-<button id="mariamBtn" onclick="openMariamPanel()" title="مريم فقط">🌸</button>
+<!-- Omar Button -->
+<button id="omarBtn" onclick="openOmarPanel()" title="عمر فقط">💙</button>
+
+<!-- Omar Panel -->
+<div id="omarPanel">
+  <div id="omarPanelBox">
+    <div id="omarPanelHeader">
+      <button id="omarCloseBtn" onclick="closeOmarPanel()">✕</button>
+      <div id="omarPanelTitle">لوحة عمورتها 💙</div>
+    </div>
+    <div id="omarScrollBody">
+      <div class="mariamSection">
+        <div class="mariamSectionTitle">🤫 الرسالة السرية</div>
+        <textarea id="omarSecretInput" placeholder="اكتب رسالتك هنا..."></textarea>
+        <button class="mariamActionBtn" onclick="omarSaveSecret()">💾 احفظ</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Mariam Panel -->
 <div id="mariamPanel">
@@ -1782,8 +1826,96 @@
 </div>
 
 <style>
-  #mariamBtn {
+  #omarBtn {
     position: fixed;
+    top: 180px;
+    left: 24px;
+    z-index: 999;
+    background: linear-gradient(135deg, rgba(240,248,255,0.92), rgba(200,225,255,0.92));
+    border: 1.5px solid rgba(100,160,230,0.4);
+    border-radius: 50%;
+    width: 42px; height: 42px;
+    font-size: 20px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(100,160,230,0.2);
+    transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #omarBtn:hover { transform: scale(1.1); }
+
+  #omarPanel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  #omarPanel.show { display: flex; }
+  #omarPanelBox {
+    background: linear-gradient(135deg, #f0f8ff, #d6e8ff);
+    border-radius: 24px;
+    padding: 0;
+    width: 90vw;
+    max-width: 380px;
+    max-height: 88vh;
+    position: relative;
+    direction: rtl;
+    box-shadow: 0 10px 50px rgba(100,160,230,0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #omarPanelHeader {
+    padding: 18px 24px 0 24px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  #omarCloseBtn {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(100,160,230,0.3);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; cursor: pointer;
+    color: #1a5fa8; opacity: 0.85;
+    z-index: 10;
+  }
+  #omarPanelTitle {
+    font-family: 'Amiri', serif;
+    font-size: 20px; font-weight: 700;
+    color: #1a5fa8; text-align: center;
+    margin-bottom: 16px;
+    padding-left: 30px;
+  }
+  #omarScrollBody {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0 24px 24px 24px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #omarSecretInput {
+    width: 100%; border: 1px solid rgba(100,160,230,0.35);
+    border-radius: 12px; padding: 10px;
+    font-family: 'Amiri', serif; font-size: 14px;
+    color: #1a3a5a; background: rgba(255,255,255,0.85);
+    resize: none; height: 140px;
+    margin-bottom: 10px; direction: rtl;
+    outline: none; box-sizing: border-box;
+  }
+  #omarPanel .mariamSection {
+    background: rgba(255,255,255,0.6);
+    border-color: rgba(100,160,230,0.2);
+  }
+  #omarPanel .mariamSectionTitle { color: #1a5fa8; }
+  #omarPanel .mariamActionBtn {
+    background: linear-gradient(135deg, #4a90d9, #74b3f0);
+  }
     top: 128px;
     left: 24px;
     z-index: 999;
