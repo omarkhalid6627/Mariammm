@@ -772,6 +772,13 @@
   }
 </style>
 
+<!-- Sticky Note -->
+<div id="stickyNote" style="display:none;position:fixed;bottom:100px;right:24px;z-index:998;width:180px;background:linear-gradient(135deg,#fff9c4,#fff3a0);border-radius:4px 16px 16px 4px;padding:16px;box-shadow:3px 4px 12px rgba(0,0,0,0.15);font-family:'Amiri',serif;direction:rtl;transform:rotate(2deg);transition:all 0.3s;">
+  <div style="font-size:11px;color:#888;margin-bottom:6px;letter-spacing:1px;">من مريومتي 💌</div>
+  <div id="stickyNoteText" style="font-size:14px;color:#5a4000;line-height:1.7;word-break:break-word;"></div>
+  <div style="position:absolute;top:-8px;right:50%;transform:translateX(50%);width:16px;height:16px;background:#e8739a;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
+</div>
+
 <!-- Floating hearts -->
 <div id="hearts-container"></div>
 
@@ -1640,6 +1647,21 @@
     }).join('');
   });
 
+  // ===== STICKY NOTE =====
+  onSnapshot(collection(db, 'notes'), (snap) => {
+    if (!snap.empty) {
+      // Get latest note
+      const notes = snap.docs.sort((a,b) => {
+        const ta = a.data().time?.toMillis?.() || 0;
+        const tb = b.data().time?.toMillis?.() || 0;
+        return tb - ta;
+      });
+      const latest = notes[0].data().text;
+      document.getElementById('stickyNoteText').textContent = latest;
+      document.getElementById('stickyNote').style.display = 'block';
+    }
+  });
+
   // Load latest secret message
   const msgQ = query(collection(db, 'messages'), orderBy('time', 'desc'));
   onSnapshot(msgQ, (snapshot) => {
@@ -1687,9 +1709,9 @@
   window.mariamSendMsg = async function() {
     const txt = document.getElementById('mariamMsgInput').value.trim();
     if (!txt) return;
-    await addDoc(collection(db, 'photos_meta'), { note: txt, time: serverTimestamp() });
+    await addDoc(collection(db, 'notes'), { text: txt, time: serverTimestamp() });
     document.getElementById('mariamMsgInput').value = '';
-    alert('✅ اتبعتت!');
+    alert('✅ الرسالة اتبعتت! هتظهر على الموقع 💌');
   };
 
   // Omar Panel
