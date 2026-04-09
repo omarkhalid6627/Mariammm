@@ -1882,43 +1882,62 @@
     omarTapTimer = setTimeout(() => { omarTitleTaps = 0; }, 1500);
   });
 
+  // ===== OCCASION CONFIG =====
+  const OCCASIONS = {
+    birthday:    { icon:'🎂', label:'كل سنة وانتِ طيبة يا روحي 🎂', color:'#ff6496', confetti:['🎂','🎁','🎈','💗','🎀','✨'] },
+    anniversary: { icon:'💑', label:'ذكرى ما اتقابلنا يا حبيبتي 💑', color:'#d43c64', confetti:['💑','🌹','💕','✨','💗','🥂'] },
+    valentine:   { icon:'💝', label:'عيد الحب يا أغلى حاجة عندي 💝', color:'#dc2850', confetti:['💝','❤️','💘','🌹','💋','✨'] },
+    eid:         { icon:'🌙', label:'كل عيد وانتِ نور حياتي 🌙',       color:'#1a9b4c', confetti:['🌙','⭐','🌟','✨','🎊','💚'] },
+    newyear:     { icon:'🎆', label:'سنة جديدة ومعاكِ أحلى 🎆',        color:'#3060d0', confetti:['🎆','🎇','⭐','🎉','✨','🌟'] },
+    surprise:    { icon:'🌸', label:'مفاجأة من عمورتك 🌸',             color:'#8020c0', confetti:['🌸','💜','✨','🦋','💫','🎁'] },
+  };
+
+  let selectedOccasion = 'birthday';
+
+  window.selectOccasion = function(type, btn) {
+    selectedOccasion = type;
+    document.querySelectorAll('.occasionBtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+
   // ===== SCHEDULED MESSAGES =====
   let activeScheduledId = null;
+  let activeOccasionType = 'birthday';
 
   function getTodayStr() {
     const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  // Listen to scheduled messages collection
   onSnapshot(collection(db, 'scheduled_msgs'), (snapshot) => {
     const today = getTodayStr();
     activeScheduledId = null;
     let todayMsg = null;
+    let todayType = 'birthday';
 
     snapshot.docs.forEach(d => {
       const data = d.data();
       if (data.date === today) {
         activeScheduledId = d.id;
         todayMsg = data.text;
+        todayType = data.occasionType || 'birthday';
       }
     });
 
-    // Show/hide star button
     const starBtn = document.getElementById('scheduledStarBtn');
     if (todayMsg) {
-      starBtn.classList.add('visible');
-      document.getElementById('scheduledMsgText').textContent = '';
-      document.getElementById('scheduledMsgFrom').textContent = '✨ مفاجأة من عمورتك ✨';
+      activeOccasionType = todayType;
+      const occ = OCCASIONS[todayType] || OCCASIONS.birthday;
+      // Update button appearance
+      starBtn.className = `visible occ-${todayType}`;
+      document.getElementById('occIcon').textContent = occ.icon;
+      starBtn.style.display = 'flex';
       window._scheduledMsgText = todayMsg;
     } else {
       starBtn.classList.remove('visible');
+      starBtn.style.display = 'none';
     }
 
-    // Render list in Omar panel
     renderScheduledList(snapshot.docs);
   });
 
@@ -1931,8 +1950,10 @@
     }
     container.innerHTML = docs.map(d => {
       const data = d.data();
+      const occ = OCCASIONS[data.occasionType] || OCCASIONS.birthday;
       return `
         <div class="scheduled-item">
+          <span class="scheduled-occ-badge">${occ.icon}</span>
           <span class="scheduled-date-badge">${data.date}</span>
           <span class="scheduled-item-text">${data.text}</span>
           <button class="scheduled-item-del" onclick="deleteScheduledMsg('${d.id}')">🗑️</button>
@@ -1948,21 +1969,36 @@
   window.omarSaveScheduled = async function() {
     const txt = document.getElementById('scheduledMsgInput').value.trim();
     const date = document.getElementById('scheduledDateInput').value;
-    if (!txt || !date) { alert('اكتب الرسالة واختار التاريخ'); return; }
+    if (!txt || !date) { alert('اكتب الرسالة واختار التاريخ والمناسبة'); return; }
     const btn = document.querySelector('#scheduledSection .mariamActionBtn');
     btn.textContent = '⏳ بيتحفظ...';
     btn.disabled = true;
-    await addDoc(collection(db, 'scheduled_msgs'), { text: txt, date, time: serverTimestamp() });
+    await addDoc(collection(db, 'scheduled_msgs'), {
+      text: txt,
+      date,
+      occasionType: selectedOccasion,
+      time: serverTimestamp()
+    });
     document.getElementById('scheduledMsgInput').value = '';
     document.getElementById('scheduledDateInput').value = '';
     btn.textContent = '✅ اتحفظت!';
-    setTimeout(() => { btn.textContent = '⭐ احفظ الرسالة'; btn.disabled = false; }, 1500);
+    setTimeout(() => { btn.textContent = '🎁 احفظ الرسالة'; btn.disabled = false; }, 1500);
   };
 
   window.openScheduledMsg = function() {
     const modal = document.getElementById('scheduledMsgModal');
+    const card  = document.getElementById('scheduledMsgCard');
+    const occ = OCCASIONS[activeOccasionType] || OCCASIONS.birthday;
+
+    // Apply occasion theme to card
+    card.className = `occ-${activeOccasionType}`;
+    document.getElementById('occModalIcon').textContent = occ.icon;
+    document.getElementById('scheduledMsgFrom').textContent = occ.label;
+    document.getElementById('scheduledMsgFrom').style.color = occ.color;
+
     modal.classList.add('open');
-    // Typewriter effect
+
+    // Typewriter
     const el = document.getElementById('scheduledMsgText');
     el.textContent = '';
     const txt = window._scheduledMsgText || '';
@@ -1980,16 +2016,17 @@
       await deleteDoc(doc(db, 'scheduled_msgs', activeScheduledId));
     }
     document.getElementById('scheduledMsgModal').classList.remove('open');
-    document.getElementById('scheduledStarBtn').classList.remove('visible');
-    // Little farewell burst
-    for (let i = 0; i < 25; i++) {
+    document.getElementById('scheduledStarBtn').style.display = 'none';
+
+    const occ = OCCASIONS[activeOccasionType] || OCCASIONS.birthday;
+    for (let i = 0; i < 35; i++) {
       setTimeout(() => {
         const el = document.createElement('div');
-        el.style.cssText = `position:fixed;z-index:99999;pointer-events:none;left:${Math.random()*100}vw;top:-10px;font-size:${14+Math.random()*14}px;animation:confettiFall ${1.5+Math.random()}s ease-in forwards;`;
-        el.textContent = ['⭐','💗','✨','🌸','💕'][Math.floor(Math.random()*5)];
+        el.style.cssText = `position:fixed;z-index:99999;pointer-events:none;left:${Math.random()*100}vw;top:-10px;font-size:${14+Math.random()*16}px;animation:confettiFall ${1.5+Math.random()}s ease-in forwards;`;
+        el.textContent = occ.confetti[Math.floor(Math.random()*occ.confetti.length)];
         document.body.appendChild(el);
-        setTimeout(() => el.remove(), 3000);
-      }, i * 70);
+        setTimeout(() => el.remove(), 3500);
+      }, i * 60);
     }
   };
 
@@ -2014,11 +2051,11 @@
   
 </script>
 
-<!-- Scheduled Star Message Button — only visible on the right day -->
+<!-- Occasion Message Button — morphs per occasion type -->
 <div id="scheduledStarBtn" onclick="openScheduledMsg()" title="مفاجأة!">
-  <div class="star-rays"></div>
-  <div class="star-core">⭐</div>
-  <div class="star-pulse"></div>
+  <div class="occ-glow"></div>
+  <div class="occ-icon" id="occIcon">🎂</div>
+  <div class="occ-ring"></div>
 </div>
 
 <!-- Scheduled Message Modal -->
@@ -2027,8 +2064,8 @@
     <div id="scheduledMsgCardTop"></div>
     <button id="scheduledMsgClose" onclick="closeScheduledMsg()">✕</button>
     <div id="scheduledMsgInner">
-      <div style="font-size:42px;margin-bottom:16px;animation:heartBeat 1.5s ease infinite;">⭐</div>
-      <div id="scheduledMsgFrom" style="font-family:'Amiri',serif;font-size:12px;color:#e8739a;letter-spacing:2px;margin-bottom:18px;opacity:0.75;"></div>
+      <div id="occModalIcon" style="font-size:48px;margin-bottom:14px;"></div>
+      <div id="scheduledMsgFrom" style="font-family:'Amiri',serif;font-size:12px;letter-spacing:2px;margin-bottom:18px;opacity:0.75;"></div>
       <div id="scheduledMsgText" style="font-family:'Amiri',serif;font-size:19px;line-height:1.9;color:#5a1f3a;white-space:pre-wrap;"></div>
       <button id="scheduledMsgReadBtn" onclick="markScheduledRead()">قرأتها ✨</button>
     </div>
@@ -2036,99 +2073,124 @@
 </div>
 
 <style>
-  /* ===== SCHEDULED STAR BUTTON ===== */
+  /* ===== OCCASION FLOATING BUTTON ===== */
   #scheduledStarBtn {
     display: none;
     position: fixed;
     bottom: 90px;
     right: 24px;
     z-index: 999;
-    width: 56px; height: 56px;
+    width: 60px; height: 60px;
     cursor: pointer;
     align-items: center; justify-content: center;
+    border-radius: 50%;
   }
   #scheduledStarBtn.visible { display: flex; }
 
-  .star-core {
+  .occ-icon {
     position: relative;
-    font-size: 30px;
+    font-size: 28px;
     z-index: 3;
-    animation: starBounce 2s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px rgba(255,200,60,0.8));
+    animation: occBounce 2.2s ease-in-out infinite;
   }
-  .star-pulse {
+  .occ-glow {
     position: absolute;
-    inset: -4px;
+    inset: 0;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,220,60,0.35), transparent 70%);
-    animation: starPulse 1.8s ease-in-out infinite;
+    animation: occGlow 2s ease-in-out infinite;
     z-index: 1;
   }
-  .star-rays {
+  .occ-ring {
     position: absolute;
-    inset: -10px;
+    inset: -6px;
     border-radius: 50%;
-    background: conic-gradient(
-      rgba(255,220,60,0.18) 0deg, transparent 30deg,
-      rgba(255,220,60,0.18) 60deg, transparent 90deg,
-      rgba(255,220,60,0.18) 120deg, transparent 150deg,
-      rgba(255,220,60,0.18) 180deg, transparent 210deg,
-      rgba(255,220,60,0.18) 240deg, transparent 270deg,
-      rgba(255,220,60,0.18) 300deg, transparent 330deg
-    );
-    animation: raysRotate 4s linear infinite;
+    border: 2px solid transparent;
+    animation: occRingSpin 3s linear infinite;
     z-index: 0;
   }
-  @keyframes starBounce {
-    0%,100% { transform: translateY(0) rotate(-5deg); }
-    50% { transform: translateY(-7px) rotate(5deg); }
+
+  @keyframes occBounce {
+    0%,100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-8px) scale(1.08); }
   }
-  @keyframes starPulse {
-    0%,100% { transform: scale(1); opacity: 0.6; }
-    50% { transform: scale(1.5); opacity: 0.2; }
+  @keyframes occGlow {
+    0%,100% { transform: scale(1); opacity: 0.5; }
+    50%      { transform: scale(1.3); opacity: 0.15; }
   }
-  @keyframes raysRotate {
+  @keyframes occRingSpin {
     from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    to   { transform: rotate(360deg); }
   }
+
+  /* Occasion themes for the button */
+  #scheduledStarBtn.occ-birthday .occ-glow { background: radial-gradient(circle, rgba(255,100,150,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-birthday .occ-ring  { border-color: rgba(255,100,150,0.5); border-top-color: transparent; }
+
+  #scheduledStarBtn.occ-anniversary .occ-glow { background: radial-gradient(circle, rgba(212,60,100,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-anniversary .occ-ring  { border-color: rgba(212,60,100,0.5); border-top-color: transparent; }
+
+  #scheduledStarBtn.occ-valentine .occ-glow { background: radial-gradient(circle, rgba(220,40,80,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-valentine .occ-ring  { border-color: rgba(220,40,80,0.5); border-top-color: transparent; }
+
+  #scheduledStarBtn.occ-eid .occ-glow { background: radial-gradient(circle, rgba(60,180,100,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-eid .occ-ring  { border-color: rgba(60,180,100,0.5); border-top-color: transparent; }
+
+  #scheduledStarBtn.occ-newyear .occ-glow { background: radial-gradient(circle, rgba(80,140,255,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-newyear .occ-ring  { border-color: rgba(80,140,255,0.5); border-top-color: transparent; }
+
+  #scheduledStarBtn.occ-surprise .occ-glow { background: radial-gradient(circle, rgba(200,100,255,0.45), transparent 70%); }
+  #scheduledStarBtn.occ-surprise .occ-ring  { border-color: rgba(200,100,255,0.5); border-top-color: transparent; }
 
   /* ===== SCHEDULED MSG MODAL ===== */
   #scheduledMsgModal {
-    display: none;
-    position: fixed;
+    display: none; position: fixed;
     inset: 0; z-index: 99999;
     background: rgba(0,0,0,0.55);
     backdrop-filter: blur(8px);
-    align-items: center; justify-content: center;
-    padding: 20px;
+    align-items: center; justify-content: center; padding: 20px;
   }
   #scheduledMsgModal.open { display: flex; }
   #scheduledMsgCard {
-    background: linear-gradient(160deg, #fffaf5 0%, #fff0f8 60%, #fde8f2 100%);
-    border-radius: 24px;
-    width: 88vw; max-width: 380px;
+    border-radius: 24px; width: 88vw; max-width: 380px;
     position: relative;
-    box-shadow: 0 16px 60px rgba(232,115,154,0.3), 0 0 0 1px rgba(232,115,154,0.15);
     animation: letterPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
     overflow: hidden;
+    background: linear-gradient(160deg, #fffaf5 0%, #fff0f8 60%, #fde8f2 100%);
+    box-shadow: 0 16px 60px rgba(232,115,154,0.3);
   }
+  /* Card themes */
+  #scheduledMsgCard.occ-birthday  { background: linear-gradient(160deg,#fff8fb,#ffe4f0,#ffd6e8); }
+  #scheduledMsgCard.occ-anniversary { background: linear-gradient(160deg,#fff5f7,#ffe0ea,#ffd0e0); }
+  #scheduledMsgCard.occ-valentine { background: linear-gradient(160deg,#fff0f0,#ffd6d6,#ffc0c0); }
+  #scheduledMsgCard.occ-eid       { background: linear-gradient(160deg,#f0fff5,#d6f5e0,#c0f0d0); }
+  #scheduledMsgCard.occ-newyear   { background: linear-gradient(160deg,#f0f5ff,#d6e5ff,#c0d5ff); }
+  #scheduledMsgCard.occ-surprise  { background: linear-gradient(160deg,#faf0ff,#ead6ff,#ddc0ff); }
+
   #scheduledMsgCardTop {
-    height: 4px;
-    background: linear-gradient(90deg, transparent, #ffe066, #f5a800, #ffe066, transparent);
+    height: 5px;
+    transition: background 0.4s;
   }
+  #scheduledMsgCard.occ-birthday  #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#ff6496,#ffb3d1,transparent); }
+  #scheduledMsgCard.occ-anniversary #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#d43c64,#f4a7c3,transparent); }
+  #scheduledMsgCard.occ-valentine #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#dc2850,#ff8080,transparent); }
+  #scheduledMsgCard.occ-eid       #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#1a9b4c,#80e0a0,transparent); }
+  #scheduledMsgCard.occ-newyear   #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#3060d0,#80b0ff,transparent); }
+  #scheduledMsgCard.occ-surprise  #scheduledMsgCardTop { background: linear-gradient(90deg,transparent,#8020c0,#d080ff,transparent); }
+
   #scheduledMsgClose {
-    position: absolute; top: 14px; left: 14px;
+    position: absolute; top:14px; left:14px;
     background: rgba(255,255,255,0.75);
     border: 1px solid rgba(232,115,154,0.3);
-    border-radius: 50%; width: 32px; height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; cursor: pointer; color: #9e3d65; z-index: 5;
+    border-radius: 50%; width:32px; height:32px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; cursor:pointer; color:#9e3d65; z-index:5;
   }
   #scheduledMsgInner {
     padding: 28px 28px 32px;
     direction: rtl; text-align: center;
     max-height: 75vh; overflow-y: auto;
   }
+  #occModalIcon { animation: heartBeat 1.5s ease infinite; }
   #scheduledMsgReadBtn {
     margin-top: 28px;
     background: linear-gradient(135deg, #e8739a, #f4a7c3);
@@ -2138,18 +2200,26 @@
     cursor: pointer; transition: all 0.3s; width: 100%;
   }
   #scheduledMsgReadBtn:hover { opacity: 0.88; transform: translateY(-2px); }
+  /* Read button color per occasion */
+  #scheduledMsgCard.occ-eid       #scheduledMsgReadBtn { background: linear-gradient(135deg,#1a9b4c,#80d090); }
+  #scheduledMsgCard.occ-newyear   #scheduledMsgReadBtn { background: linear-gradient(135deg,#3060d0,#80b0ff); }
+  #scheduledMsgCard.occ-valentine #scheduledMsgReadBtn { background: linear-gradient(135deg,#dc2850,#ff8080); }
+  #scheduledMsgCard.occ-surprise  #scheduledMsgReadBtn { background: linear-gradient(135deg,#8020c0,#d080ff); }
 
   /* Scheduled list in Omar panel */
   .scheduled-item {
     background: rgba(255,255,255,0.7);
     border: 1px solid rgba(100,160,230,0.25);
     border-radius: 12px; padding: 10px 14px; margin-bottom: 8px;
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
     direction: rtl; font-family: 'Amiri', serif;
   }
   .scheduled-date-badge {
     font-size: 11px; color: #4a90d9; font-weight: 700; flex-shrink: 0;
-    background: rgba(74,144,217,0.1); padding: 3px 10px; border-radius: 20px;
+    background: rgba(74,144,217,0.1); padding: 3px 8px; border-radius: 20px;
+  }
+  .scheduled-occ-badge {
+    font-size: 14px; flex-shrink: 0;
   }
   .scheduled-item-text {
     font-size: 13px; color: #1a3a5a; flex: 1;
@@ -2213,22 +2283,56 @@
         <div class="mariamSection" style="border:1.5px dashed rgba(100,160,230,0.5);position:relative;overflow:hidden;">
           <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#4a90d9,#74b3f0,transparent);"></div>
           <div class="mariamSectionTitle" style="display:flex;align-items:center;gap:8px;">
-            <span>⭐</span> رسالة في يوم معين
+            <span>🎁</span> رسالة مناسبة خاصة
             <span style="font-size:10px;font-weight:400;opacity:0.5;margin-right:auto;">سري</span>
           </div>
           <div id="scheduledList" style="margin-bottom:14px;"></div>
+
+          <!-- Occasion type picker -->
+          <div style="margin-bottom:12px;">
+            <div style="font-family:'Amiri',serif;font-size:12px;color:#1a5fa8;opacity:0.7;margin-bottom:8px;text-align:right;">🎀 نوع المناسبة</div>
+            <div id="occasionPicker" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+              <button class="occasionBtn active" data-type="birthday" onclick="selectOccasion('birthday',this)">🎂 عيد ميلاد</button>
+              <button class="occasionBtn" data-type="anniversary" onclick="selectOccasion('anniversary',this)">💑 ذكرى الارتباط</button>
+              <button class="occasionBtn" data-type="valentine" onclick="selectOccasion('valentine',this)">💝 عيد الحب</button>
+              <button class="occasionBtn" data-type="eid" onclick="selectOccasion('eid',this)">🌙 عيد / رمضان</button>
+              <button class="occasionBtn" data-type="newyear" onclick="selectOccasion('newyear',this)">🎆 رأس السنة</button>
+              <button class="occasionBtn" data-type="surprise" onclick="selectOccasion('surprise',this)">🌸 مفاجأة</button>
+            </div>
+          </div>
+
           <textarea id="scheduledMsgInput" placeholder="اكتب الرسالة هنا..." style="width:100%;border:1px solid rgba(100,160,230,0.35);border-radius:12px;padding:10px;font-family:'Amiri',serif;font-size:14px;color:#1a3a5a;background:rgba(255,255,255,0.85);resize:none;height:100px;margin-bottom:10px;direction:rtl;outline:none;box-sizing:border-box;"></textarea>
           <div style="margin-bottom:12px;">
             <div style="font-family:'Amiri',serif;font-size:12px;color:#1a5fa8;opacity:0.7;margin-bottom:6px;text-align:right;">📅 اختار اليوم اللي هتظهر فيه</div>
             <input type="date" id="scheduledDateInput" style="width:100%;border:1px solid rgba(100,160,230,0.35);border-radius:12px;padding:10px 14px;font-family:'Amiri',serif;font-size:14px;color:#1a3a5a;background:rgba(255,255,255,0.85);outline:none;box-sizing:border-box;direction:ltr;" />
           </div>
-          <button class="mariamActionBtn" onclick="omarSaveScheduled()" style="background:linear-gradient(135deg,#4a90d9,#74b3f0);">⭐ احفظ الرسالة</button>
+          <button class="mariamActionBtn" onclick="omarSaveScheduled()" style="background:linear-gradient(135deg,#4a90d9,#74b3f0);">🎁 احفظ الرسالة</button>
         </div>
       </div>
 
     </div>
   </div>
 </div>
+
+<style>
+  .occasionBtn {
+    background: rgba(255,255,255,0.65);
+    border: 1.5px solid rgba(100,160,230,0.3);
+    border-radius: 50px;
+    padding: 7px 13px;
+    font-family: 'Amiri', serif;
+    font-size: 13px;
+    color: #1a5fa8;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .occasionBtn.active {
+    background: linear-gradient(135deg, #4a90d9, #74b3f0);
+    border-color: transparent;
+    color: white;
+    font-weight: 700;
+  }
+</style>
 
 <!-- Mariam Button -->
 <button id="mariamBtn" onclick="openMariamPanel()" title="مريم فقط">🌸</button>
