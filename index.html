@@ -1184,11 +1184,6 @@
 
   function openSecret() {
     document.getElementById('secretModal').classList.add('open');
-    const el = document.getElementById('secretMessage');
-    if (window._secretText && !window._secretRevealed) {
-      window._secretRevealed = true;
-      inkRevealText(el, window._secretText);
-    }
   }
 
   function closeSecret(e) {
@@ -1628,11 +1623,17 @@
 
     if (!letterOpened) {
       letterOpened = true;
+      // Typewriter effect
       const el = document.getElementById('letterText');
       el.textContent = '';
       let i = 0;
       const txt = currentLetter;
-      const type = () => { if (i < txt.length) { el.textContent += txt[i++]; setTimeout(type, 35); } };
+      const type = () => {
+        if (i < txt.length) {
+          el.textContent += txt[i++];
+          setTimeout(type, 35);
+        }
+      };
       setTimeout(type, 300);
     } else {
       document.getElementById('letterText').textContent = currentLetter;
@@ -1654,62 +1655,6 @@
     letterOpened = false; // reset so typewriter plays again
     alert('✅ الرسالة اتبعتت! 💌');
   };
-
-  // ===== INK-ON-PAPER REVEAL (secret message) =====
-  function inkRevealText(el, text) {
-    el.innerHTML = '';
-    const allItems = [];
-
-    text.split('\n').forEach((line, lineIdx) => {
-      if (lineIdx > 0) el.appendChild(document.createElement('br'));
-      line.split(/(\s+)/).forEach(token => {
-        if (!token) return;
-        if (/^\s+$/.test(token)) { el.appendChild(document.createTextNode(token)); return; }
-
-        const span = document.createElement('span');
-        span.textContent = token;
-
-        const arabicChars = (token.match(/[\u0600-\u06FF]/g) || []).length;
-        const isArabic = arabicChars > token.length * 0.3;
-
-        // Start: clipped + wet ink shadow
-        span.style.cssText = `
-          display: inline-block;
-          clip-path: ${isArabic ? 'inset(0 0% 0 102%)' : 'inset(0 102% 0 0%)'};
-          text-shadow:
-            0 0 6px rgba(40,8,20,0.95),
-            1px 1px 4px rgba(90,20,45,0.8),
-            -1px -1px 3px rgba(90,20,45,0.6),
-            2px 0 5px rgba(58,10,30,0.5);
-          will-change: clip-path, text-shadow;
-          transition: none;
-        `;
-        allItems.push({ span, len: token.length });
-        el.appendChild(span);
-      });
-    });
-
-    // Realistic pen-stroke rhythm: longer words take more time
-    let cumDelay = 350;
-    allItems.forEach(({ span, len }) => {
-      const strokeDur = Math.min(0.2 + len * 0.025, 0.42);
-      const pauseAfter = 110 + len * 16 + Math.random() * 110;
-      const myDelay = cumDelay;
-      cumDelay += pauseAfter;
-
-      setTimeout(() => {
-        // Stroke: word sweeps in cleanly (no fade, pure clip reveal)
-        span.style.transition = `clip-path ${strokeDur}s cubic-bezier(0.4,0,0.2,1)`;
-        span.style.clipPath = 'inset(0 0% 0 0%)';
-
-        // Ink dries: bleed settles but a subtle trace stays forever (real ink)
-        setTimeout(() => {
-          span.style.transition = 'text-shadow 1.4s ease';
-          span.style.textShadow = '0 0 1px rgba(40,8,20,0.22), 0.5px 0.5px 1px rgba(90,20,45,0.12)';
-        }, 200);
-      }, myDelay);
-    });
-  }
 
   // ===== MOOD =====
   let currentMoodEmoji = null;
@@ -2089,10 +2034,7 @@
   onSnapshot(collection(db, 'secretmsg'), (snapshot) => {
     if (!snapshot.empty) {
       const txt = snapshot.docs[0].data().text;
-      // Store for ink reveal — reset so effect replays on new message
-      window._secretText = txt;
-      window._secretRevealed = false;
-      document.getElementById('secretMessage').innerHTML = '';
+      document.getElementById('secretMessage').innerHTML = txt.replace(/\n/g, '<br>');
       // pre-fill textarea
       const input = document.getElementById('omarSecretInput');
       if (input) input.value = txt;
