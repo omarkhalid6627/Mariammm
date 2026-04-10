@@ -1623,18 +1623,7 @@
 
     if (!letterOpened) {
       letterOpened = true;
-      // Typewriter effect
-      const el = document.getElementById('letterText');
-      el.textContent = '';
-      let i = 0;
-      const txt = currentLetter;
-      const type = () => {
-        if (i < txt.length) {
-          el.textContent += txt[i++];
-          setTimeout(type, 35);
-        }
-      };
-      setTimeout(type, 300);
+      inkRevealText(document.getElementById('letterText'), currentLetter);
     } else {
       document.getElementById('letterText').textContent = currentLetter;
     }
@@ -1655,6 +1644,70 @@
     letterOpened = false; // reset so typewriter plays again
     alert('✅ الرسالة اتبعتت! 💌');
   };
+
+  // ===== INK REVEAL EFFECT =====
+  function inkRevealText(el, text) {
+    el.innerHTML = '';
+    const allSpans = [];
+
+    const lines = text.split('\n');
+    lines.forEach((line, lineIdx) => {
+      if (lineIdx > 0) el.appendChild(document.createElement('br'));
+
+      const tokens = line.split(/(\s+)/);
+      tokens.forEach(token => {
+        if (!token) return;
+        if (/^\s+$/.test(token)) {
+          el.appendChild(document.createTextNode(token));
+          return;
+        }
+
+        const span = document.createElement('span');
+        span.textContent = token;
+
+        // Detect Arabic: majority of chars are Arabic/RTL
+        const arabicCount = (token.match(/[\u0600-\u06FF\u0750-\u077F]/g) || []).length;
+        const isArabic = arabicCount > token.length * 0.4;
+
+        // Arabic → reveal right-to-left (ink flows from right)
+        // English → reveal left-to-right (ink flows from left)
+        const startClip = isArabic
+          ? 'inset(0 0% 0 110%)'
+          : 'inset(0 110% 0 0%)';
+
+        span.style.cssText = `
+          display: inline-block;
+          clip-path: ${startClip};
+          opacity: 0;
+          filter: blur(3px) sepia(0.3);
+          transition: none;
+          will-change: clip-path, opacity, filter;
+        `;
+
+        allSpans.push(span);
+        el.appendChild(span);
+      });
+    });
+
+    // Staggered ink reveal — each word flows in like wet ink
+    el.classList.add('writing');
+    allSpans.forEach((span, i) => {
+      setTimeout(() => {
+        span.style.transition = [
+          'clip-path 0.5s cubic-bezier(0.22, 0.61, 0.36, 1)',
+          'opacity 0.35s ease',
+          'filter 0.6s ease'
+        ].join(', ');
+        span.style.clipPath = 'inset(0 0% 0 0%)';
+        span.style.opacity  = '1';
+        span.style.filter   = 'blur(0) sepia(0)';
+        // Remove cursor after last word
+        if (i === allSpans.length - 1) {
+          setTimeout(() => el.classList.remove('writing'), 600);
+        }
+      }, 180 + i * 72);
+    });
+  }
 
   // ===== MOOD =====
   let currentMoodEmoji = null;
@@ -2840,6 +2893,21 @@
     color: #5a1f3a;
     white-space: pre-wrap;
     min-height: 40px;
+    position: relative;
+  }
+  /* ink pen cursor — little moving dot at end of last word */
+  #letterText.writing::after {
+    content: '|';
+    display: inline-block;
+    color: #e8739a;
+    opacity: 0.85;
+    animation: inkBlink 0.6s steps(1) infinite;
+    font-weight: 300;
+    margin-inline-start: 2px;
+  }
+  @keyframes inkBlink {
+    0%, 100% { opacity: 0.85; }
+    50%       { opacity: 0; }
   }
   #mariamPanel {
     display: none;
